@@ -12,12 +12,13 @@ import (
 	"os"
 	"unsafe"
 	"net"
+	"encoding/hex"
 
 	"./rtp"
 	"./decoder"
 	"./encoder"
 	"./filter"
-	//"./rtp"
+	"./h264"
 
 )
 
@@ -128,7 +129,7 @@ func testSaveBlackBackground() {
 }
 
 func testDecodeEncode() {
-	data, err := ioutil.ReadFile("record.h264")
+	data, err := ioutil.ReadFile("720p.h264")
     if err != nil {
         log.Debug("File reading error", err)
         return
@@ -139,15 +140,15 @@ func testDecodeEncode() {
 
 	dec := decoder.AllocAll(avcodec.CodecId(avcodec.AV_CODEC_ID_H264))
 	
-	enc := encoder.AllocAll(avcodec.CodecId(avcodec.AV_CODEC_ID_MPEG4))
-	enc.SetEncodeParams(1104, 622,
+	enc := encoder.AllocAll(avcodec.CodecId(avcodec.AV_CODEC_ID_H264))
+	enc.SetEncodeParams(1280, 720,
 					   avcodec.AV_PIX_FMT_YUV420P,
-					   true, 2,
+					   false, 2,
 					   1, 30)
 	
 	b := make([]byte, 4096 + 64)
 	
-	file, err := os.Create("./out.mp4")
+	file, err := os.Create("./out.h264")
 	if err != nil {
 		log.Critical("Error Reading")
 	}
@@ -191,12 +192,12 @@ func testDecodeEncode() {
 
 
 func testRtpDEncodeDes4() {
-	filters := filter.New(filter.Description4)
+	filters := filter.New(filter.P720Description4)
 	filters.GraphDump()
 
 	dec := decoder.AllocAll(avcodec.CodecId(avcodec.AV_CODEC_ID_H264))
 	enc := encoder.AllocAll(avcodec.CodecId(avcodec.AV_CODEC_ID_H264))
-	enc.SetEncodeParams(1920, 1080,
+	enc.SetEncodeParams(1280, 720,
 					   avcodec.AV_PIX_FMT_YUV420P,
 					   false, 2,
 					   1, 30)
@@ -207,10 +208,7 @@ func testRtpDEncodeDes4() {
 	defer file.Close()
 
 	go func() {
-		black := filter.New(filter.BlackColor)
-		//filter1 := filter.New(filter.BlackColor)
-		//filter2 := filter.New(filter.BlackColor)
-		//filter3 := filter.New(filter.BlackColor)
+		black := filter.New(filter.P720BlackColor)
 
 		time.Sleep(1*time.Second)
 		
@@ -228,7 +226,8 @@ func testRtpDEncodeDes4() {
 	
 		defer conn.Close()
 
-		rtpParser := rtp.NewParser(4096)
+		rtpParser  := rtp.NewParser(1500)
+		h264Praser := h264.NewParser()
 
 		for {	
 			n, remoteAddr, err := conn.ReadFromUDP(rtpParser.Buffer())
@@ -236,28 +235,73 @@ func testRtpDEncodeDes4() {
 				log.Error("failed to read UDP msg because of ", err.Error())
 				return
 			}
+
 			rtpParser.SetPacketLength(n);
-			rtpParser.Print("rtp vedio");
-			time.Sleep(1*time.Second)
+			//rtpParser.Print("rtp vedio");
+			//time.Sleep(1*time.Second)
 			rtpParser.Payload()
 			log.Debug("recv ", n, " message from ", remoteAddr)//, ": ", hex.EncodeToString(rtpParser.Buffer()))
-			log.Debug("------h264 Data: \n", rtpParser.Payload())
+			
+			//log.Debug("------h264 Data: \n", rtpParser.Payload())
 
-			remain := len(rtpParser.Payload())
+			h264Praser.FillNaluHead(rtpParser.Payload()[0])
+
+			var h264Buffer []byte
+			if h264Praser.NaluType() == h264.NalueTypeFuA {
+				h264Praser.FillShadUnitA([2]byte{rtpParser.Payload()[0], rtpParser.Payload()[1]})
+				if h264Praser.ShardA().IsStart() {
+					log.Trace("-----is fuA start------")
+					h264Buffer = append(h264Buffer, h264.StartCode[0:]...)
+					h264Buffer = append(h264Buffer, h264Praser.ShardA().NaluHeader())
+					h264Buffer = append(h264Buffer, rtpParser.Payload()[2:]...)
+				} else if h264Praser.ShardA().IsEnd() {
+					log.Trace("-----is fuA end--------")
+					h264Buffer = append(h264Buffer, rtpParser.Payload()[2:]...)
+					//log.Trace("len: ", len(h264Buffer), ":\n", hex.EncodeToString(h264Buffer))
+				} else {
+					log.Trace("-----is fuA slice------")
+
+					h264Buffer = append(h264Buffer, rtpParser.Payload()[2:]...)
+				}
+			} else {
+				log.Trace("nalu : ", h264Praser.NaluType())			
+
+				h264Buffer = append(h264Buffer, h264.StartCode[0:]...)
+				h264Buffer = append(h264Buffer, rtpParser.Payload()[0:]...)
+				//log.Trace("len: ", len(h264Buffer), ":\n", hex.EncodeToString(h264Buffer))
+				
+			}
+
+			remain := len(h264Buffer)
+			nRead  := 0
 			for remain > 0 {
-				nRead := dec.ParserPacket(rtpParser.Payload(), remain)
+				nRead = dec.ParserPacket(h264Buffer[nRead:remain + nRead], remain)
 				remain = remain - nRead
 
-				log.Trace("--------", dec.Packet().GetPacketSize())
+				log.Trace(hex.EncodeToString([]byte{'-','-','-',}), dec.Packet().GetPacketSize())
+				log.Trace("decode parsered ", dec.Packet().GetPacketSize(), " Bytes")
 				if dec.Packet().GetPacketSize() > 0 {
 					if dec.GenerateFrame() == 0 {
+
 						blackFrame := black.GetFilterOutFrame()
-			
+						log.Trace("dec.FrameNumber() :", dec.Context().FrameNumber(), " AvGetPictureTypeChar:", avutil.AvGetPictureTypeChar(dec.Frame().PictureType()))
+						//log.Trace(dec.Frame().)
+						//dec.Frame().SetPts()
+						log.Trace("PTS : ", avutil.GetBestEffortTimestamp(dec.Frame()), "/", avutil.GetBestEffortTimestamp(blackFrame))
+						log.Trace("Pkt_PTS : ", avutil.GetPktPts(dec.Frame()), "/", avutil.GetPktPts(blackFrame))
+	
+						pictType := avutil.AvGetPictureTypeChar(dec.Frame().PictureType())
+						if pictType == "B" || pictType == "I" || pictType == "P" {
+							dec.IncrIbpFrameCount()
+							dec.Frame().SetPts(dec.IbpFrameCount())
+						}
+						dec.Frame().SetPts(int64(dec.Context().FrameNumber()))
+
 						if blackFrame != nil { 
 							log.Trace(len(filters.Ins()), " 0")
-							avfilter.AvBuffersrcAddFrame(filters.Ins()[0], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
-							avfilter.AvBuffersrcAddFrame(filters.Ins()[1], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
-							avfilter.AvBuffersrcAddFrame(filters.Ins()[3], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
+							avfilter.AvBuffersrcWriteFrame(filters.Ins()[0], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
+							avfilter.AvBuffersrcWriteFrame(filters.Ins()[1], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
+							avfilter.AvBuffersrcWriteFrame(filters.Ins()[3], (*avfilter.Frame)(unsafe.Pointer(blackFrame)))
 						}
 
 						log.Trace(len(filters.Ins()), " 2")
@@ -270,6 +314,16 @@ func testRtpDEncodeDes4() {
 							if enc.GeneratePacket(frame) == 0 {
 								cache := enc.ToBytes()
 								file.Write(cache)
+								
+								log.Trace("wb++++\n", hex.EncodeToString(cache))
+
+								/*l := len(cache)
+								maxRpSize := 1500 - 64
+								if l > maxRpSize {
+
+								} else {
+									conn.Send()
+								}*/
 							}
 						}
 						avutil.AvFrameUnref(blackFrame)
@@ -342,7 +396,7 @@ func testUdpH264Des4() {
 				log.Error("failed to read UDP msg because of ", err.Error())
 				return
 			}
-			log.Debug("recv ", n, " message from ", remoteAddr)//, ": ", hex.EncodeToString(rtpParser.Buffer()))
+			log.Debug("recv ", n, " message from ", remoteAddr)
 			//log.Debug("------h264 Data: \n", buffer[0:remain])
 
 			remain := n
@@ -418,7 +472,7 @@ func main() {
 	//go testSaveBlackBackground()
 	//go testDecodeEncode()
 	//testSaveDescription4()
-	//testRtpDEncodeDes4()
-
-	testUdpH264Des4()
+	testRtpDEncodeDes4()
+	//testDecodeEncode()
+	//testUdpH264Des4()
 }
