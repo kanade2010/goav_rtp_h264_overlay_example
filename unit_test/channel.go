@@ -4,6 +4,7 @@ import(
 	"time"
 	"fmt"
 	"net"
+	"../cron"
 	log "github.com/astaxie/beego/logs"
 )
 
@@ -77,24 +78,74 @@ func LinstenAndServe() {
 
 }
 
-func main() {
-	
-	for i := 0; i < 4; i++ {
-		channels[i]    = New()
-		channels[i].id = i
-	}
+type onFrame struct {
+	chanId int
+	frame  string
+}
 
-	go LinstenAndServe()
+func (of *onFrame) Id() int {
+	return of.chanId
+}
+
+func (of *onFrame) Frame() string {
+	return of.frame
+}
+
+var flush chan bool = make(chan bool)
+var updateFrame chan *onFrame = make(chan *onFrame)
+
+flushTick := time.NewTicker(300*time.Millisecond)
+
+func testChanSelect() {
+
+	back_frames := []string{"chan 0", "chan 1", "chan 2", "chan 3"} 
+
+//	back_str := "I'm Back String."
+
 
 	for {
+		fmt.Println(back_frames)
 		select {
-			case pkt := <- channels[0].Chan() :
-				fmt.Println(pkt)
-				pkt[0] = 0x55
-	
-			case pkt := <- channels[1].Chan() :
-				fmt.Println(pkt)
+			case frame := <- updateFrame :
+				back_frames[frame.Id()] = frame.Frame()
+				fmt.Println("update frame : ", frame.Frame())
+
+			case <- flushTick.C :
+				fmt.Println("on time flush frame to filter")
+				fmt.Println(back_frames)
 		}
 	}
+}
 
+func main() {
+	cron := cron.New()
+
+	
+	go testChanSelect()
+
+	i := "*"
+
+	/*for j := 0; j < 30 ; j++ {
+		//updateFrame <- &onFrame{0, i}
+		flush <- true
+		fmt.Println("update frame on chan 0 : ", i)
+		time.Sleep(1*time.Second)
+		i += " *"
+	}
+
+	time.Sleep(10000*time.Second)*/
+
+
+
+	//cron.AddFunc("*/0.5 * * * * ?", func(){flush <- true})
+	cron.AddFunc("*/1 * * * * ?", func(){i += " *"})
+
+	cron.AddFunc("*/3 * * * * ?", func(){updateFrame <- &onFrame{0, i}})
+	
+	//cron.AddFunc("*/3 * * * * ?", func(){updateFrame <- &onFrame{1, i}})
+	//cron.AddFunc("*/3 * * * * ?", func(){updateFrame <- &onFrame{2, i}})
+
+	cron.Start()
+
+	time.Sleep(10000*time.Second)
 }

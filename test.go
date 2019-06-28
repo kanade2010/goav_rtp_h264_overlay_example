@@ -610,7 +610,8 @@ func testRtpTransportDes4() {
 
 								for _, v := range nalus {
 									rps := rtpPacket.ParserNaluToRtpPayload(v)
-									
+
+									// H264 30FPS : 90000 / 30 : diff = 3000
 									rtpPacket.SetTimeStamp(rtpPacket.TimeStamp() + 3000)
 									
 									for _, q := range rps {
