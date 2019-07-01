@@ -124,12 +124,12 @@ func New(description string) *filter {
 					log.Critical("AvfilterGraphCreateFilter Failed des : ", avutil.ErrorFromCode(ret))
 				}
 				ins = append(ins, in)
-				log.Trace("-----append-ins-----", len(ins))
+				//log.Trace("-----append-ins-----", len(ins))
 			}
 			
 			index := 0
 			for cur := inputs; cur != nil; cur = cur.Next() {
-				log.Debug("index :", index)
+				//log.Debug("index :", index)
 				ret = avfilter.AvfilterLink(ins[index], 0, cur.FilterContext(), cur.PadIdx())
 				if ret < 0 {
 					log.Critical("AvfilterLink Failed des : ", avutil.ErrorFromCode(ret))

@@ -8,6 +8,7 @@ import (
 
 const (
     rtpHeaderLength    = 12
+    MaxRtpPacketSize   = 1500
 )
 
 const (
@@ -60,6 +61,10 @@ type Parser struct{
 // handling functions may re-allocate buffers.
 func NewParser(size int) *Parser {
     return &Parser{RawPacket{make([]byte, size + 64)}, 0}
+}
+
+func NewDefaultParser() *Parser {
+    return &Parser{RawPacket{make([]byte, MaxRtpPacketSize + 64)}, 0}
 }
 
 func (raw *RawPacket) Buffer() []byte {
