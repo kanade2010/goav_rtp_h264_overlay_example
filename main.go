@@ -52,13 +52,13 @@ func updateFrameIn30Ms(c chan *avutil.Frame, index int) {
 	select {
 		case frame := <- c :
 			mux.Lock()
-			log.Trace(index, " wb+++1 lastFrames : ", lastFrames)
+			//log.Trace(index, " wb+++1 lastFrames : ", lastFrames)
 			avutil.AvFrameUnref(lastFrames[index])
 			lastFrames[index] = frame
-			log.Trace(index, " wb+++2 lastFrames : ", lastFrames)
+			//log.Trace(index, " wb+++2 lastFrames : ", lastFrames)
 			mux.Unlock()
 		case <- timeout.C :
-			log.Trace("updateFrameIn30Ms index : ", index, "timeout.")
+			//log.Trace("updateFrameIn30Ms index : ", index, "timeout.")
 	}
 
 	wait.Done()
@@ -112,7 +112,7 @@ func fourChannelFilter() {
 
 		out := f.GetFilterOutFrame()
 		if out != nil {
-			log.Debug("--------------------filter out !")
+			//log.Debug("--------------------filter out !")
 			frame := avutil.AvFrameClone(out)
 			avutil.AvFrameUnref(out)
 
@@ -269,7 +269,7 @@ func rtpSend(conn *net.UDPConn){
 	for {
 		select {
 		case frame := <- onEncFrame :
-			log.Debug("on frame :", frame)
+			//log.Debug("on frame :", frame)
 			if enc.GeneratePacket(frame) == 0 {
 				bytes := enc.ToBytes()
 				file.Write(bytes)
@@ -305,10 +305,20 @@ func rtpSend(conn *net.UDPConn){
 }
 
 func main() {
+	args := os.Args
 	
-	vedioAddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:8000")
+	if len(args) != 2 {
+		log.Critical("input args error")
+		return
+	}
+
+	local := "0.0.0.0:" + args[1]
+	log.Debug("local listen addr : ", local)
+
+	vedioAddr, err := net.ResolveUDPAddr("udp", local)
 	if err != nil{
-		log.Critical("net ResolveUDPAddr Error.")
+		log.Critical("net ResolveUDPAddr Error : ", err)
+		return 
 	}
 
 	log.Debug("local vedio addresses : ", vedioAddr.IP, ":", vedioAddr.Port)
@@ -316,6 +326,7 @@ func main() {
 	conn, err := net.ListenUDP("udp", vedioAddr)
 	if err != nil {
 		log.Critical("net ListenUDP.")
+		return 
 	}
 
 	defer conn.Close()

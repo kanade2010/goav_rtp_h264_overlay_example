@@ -84,13 +84,13 @@ func (d *Decoder) ParserPacket(buf []byte, size int) int {
 func (d *Decoder) GenerateFrame() int {
 	ret := d.context.AvcodecSendPacket(d.pkt)
 	if ret < 0 {
-		log.Trace("AvcodecSendPacket err ", avutil.ErrorFromCode(ret))
+		log.Error("AvcodecSendPacket err ", avutil.ErrorFromCode(ret))
 		return ret
 	}
 
 	ret = d.context.AvcodecReceiveFrame((*avcodec.Frame)(unsafe.Pointer(d.frame)))
 	if ret < 0 {
-		log.Trace("AvcodecReceiveFrame err ", avutil.ErrorFromCode(ret))
+		log.Error("AvcodecReceiveFrame err ", avutil.ErrorFromCode(ret))
 		return ret
 	}
 

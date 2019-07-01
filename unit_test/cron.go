@@ -5,9 +5,13 @@ import(
 	"../cron"
 	"fmt"
 	"time"
+	"os"
 )
 
 func main() {
+
+	args := os.Args
+	fmt.Println(args)
 
 	cron := cron.New()
 
