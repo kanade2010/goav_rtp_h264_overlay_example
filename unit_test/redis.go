@@ -107,6 +107,14 @@ func main() {
     return 
   }
 
+  nill, err  := conn.Do("get", nil)
+  if err != nil {
+    log.Critical("redis select failed.")
+    return 
+  }
+
+  log.Debug(nill)
+
   log.Debug("--------start---------")
 
   v, err := conn.Do("get", "xiaozhang")
