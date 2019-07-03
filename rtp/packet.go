@@ -119,14 +119,14 @@ func (p *Packet) ParserNaluToRtpPayload(nalu []byte) [][]byte {
 		ret     = append(ret, start)
 		offset  = offset + MaxRtpPayloadSize - 2
 
-		remain := len(nalu) - MaxRtpPayloadSize
+		remain := len(n) - MaxRtpPayloadSize - 1
 	
 		for remain > MaxRtpPayloadSize - 2 {
 			slice := append(make([]byte, 0), saSlice.fuIndicator, saSlice.fuHeader)
 			slice  = append(slice, n[offset:MaxRtpPayloadSize + offset - 2]...)
 			ret    = append(ret, slice)
 			offset = offset + MaxRtpPayloadSize - 2
-			remain = remain - MaxRtpPayloadSize
+			remain = remain - MaxRtpPayloadSize - 2 
 		}
 
 		end := append(make([]byte, 0), saEnd.fuIndicator, saEnd.fuHeader)
