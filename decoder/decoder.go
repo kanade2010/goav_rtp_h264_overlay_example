@@ -98,11 +98,11 @@ func (d *Decoder) GenerateFrame() int {
 }
 
 func (d *Decoder) FreeAll() {
+	avcodec.AvParserClose(d.parserContext)
+	d.context.AvcodecFreeContext()
 	avutil.AvFrameFree(d.frame)
 	d.pkt.AvFreePacket()
-	avcodec.AvParserClose(d.parserContext)
-	d.context.AvcodecClose()
-	//d.context.AvcodecFreeContext()
+	//d.context.AvcodecClose()
 }
 
 

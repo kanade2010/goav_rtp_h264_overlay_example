@@ -42,7 +42,7 @@ const (
 				   		"[background+in0_scale+in1_scale+in2_scale][in3_scale] overlay=x=641:y=361 [out]"
 )
 
-type filter struct {
+type Filter struct {
 	ins 		[]*avfilter.Context
 	out 		*avfilter.Context
 	graph   	*avfilter.Graph
@@ -50,16 +50,16 @@ type filter struct {
 	description string //SplitScreen 0, 1, 4, 8, 16 
 }
 
-func (f *filter) GraphDump() {
+func (f *Filter) GraphDump() {
 	o := f.graph.AvfilterGraphDump("")
 	log.Info("GraphDump : \n", o)
 }
 
-func (f *filter) Ins() []*avfilter.Context {
+func (f *Filter) Ins() []*avfilter.Context {
 	return f.ins
 }
 
-func New(description string) *filter {
+func New(description string) *Filter {
 	graph := avfilter.AvfilterGraphAlloc()
 	if graph == nil {
 		log.Critical("AvfilterGraphAlloc Failed.")
@@ -105,6 +105,32 @@ func New(description string) *filter {
 		case Description1,
 			 P720Description1:
 			log.Info("Create Description1 Filter.")
+			var args string
+			if description == Description1 {
+				args = "video_size=1920x1080:pix_fmt=0:time_base=1/30:pixel_aspect=1/1"
+			} else {
+				args = "video_size=1280x720:pix_fmt=0:time_base=1/30:pixel_aspect=1/1"
+			}
+			for i := 0; i < 1; i++ {
+				var in *avfilter.Context
+				inName := "in" + strconv.Itoa(i)
+				ret = avfilter.AvfilterGraphCreateFilter(&in, buffersrc, inName, args, 0, graph)
+				if ret < 0 {
+					log.Critical("AvfilterGraphCreateFilter Failed des : ", avutil.ErrorFromCode(ret))
+				}
+				ins = append(ins, in)
+				//log.Trace("-----append-ins-----", len(ins))
+			}
+			
+			index := 0
+			for cur := inputs; cur != nil; cur = cur.Next() {
+				//log.Debug("index :", index)
+				ret = avfilter.AvfilterLink(ins[index], 0, cur.FilterContext(), cur.PadIdx())
+				if ret < 0 {
+					log.Critical("AvfilterLink Failed des : ", avutil.ErrorFromCode(ret))
+				}
+				index++
+			}
 
 		case Description4,
 			 P720Description4:
@@ -159,7 +185,7 @@ func New(description string) *filter {
 
 	//log.Trace("GraphDump : \n", graph.AvfilterGraphDump(""))
 
-	return &filter{
+	return &Filter{
 		ins         : ins,
 		out 	    : out,
 		graph       : graph,
@@ -178,7 +204,7 @@ func New(description string) *filter {
 }*/
 
 // warning need unref !
-func (f *filter) GetFilterOutFrame() *avutil.Frame {
+func (f *Filter) GetFilterOutFrame() *avutil.Frame {
 	ret := avfilter.AvBufferSinkGetFrame(f.out, (*avfilter.Frame)(unsafe.Pointer(f.frame)))
 
 	if ret == avutil.AvErrorEOF || ret == avutil.AvErrorEAGAIN {
@@ -193,4 +219,14 @@ func (f *filter) GetFilterOutFrame() *avutil.Frame {
 
 	return f.frame
 
+}
+
+func (f *Filter) FreeAll() {
+	f.graph.AvfilterGraphFree()
+	avutil.AvFrameFree(f.frame)
+	f.out.AvfilterFree()
+
+	for i := 0; i < len(f.ins); i++ {
+		f.ins[i].AvfilterFree()
+	}
 }

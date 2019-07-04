@@ -37,7 +37,7 @@ func PackH264DataToNalus(bytes []byte) [][]byte {
 }
 
 func main()  {
-	raddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:8000")
+	raddr, err := net.ResolveUDPAddr("udp", "0.0.0.0:10000")
 	if err != nil{
 		log.Critical("net ResolveUDPAddr Error.")
 	}
