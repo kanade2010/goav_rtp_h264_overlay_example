@@ -39,7 +39,7 @@ func (g *Graph) AvfilterGraphConfig(l int) int {
 
 //Free a graph, destroy its links, and set *graph to NULL.
 func (g *Graph) AvfilterGraphFree() {
-	C.avfilter_graph_free((**C.struct_AVFilterGraph)(unsafe.Pointer(g)))
+	C.avfilter_graph_free((**C.struct_AVFilterGraph)(unsafe.Pointer(&g)))
 }
 
 //Add a graph described by a string to a graph.

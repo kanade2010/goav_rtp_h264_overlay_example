@@ -187,8 +187,11 @@ func startServe(conn *net.UDPConn) {
 
 		remain := len(h264Slice)
 		nRead  := 0
+		aRead  := 0
 		for remain > 0 {
-			nRead = decChannels[remoteAddr.String()].Dec().ParserPacket(h264Slice[nRead:remain + nRead], remain)
+
+			nRead = decChannels[remoteAddr.IP.String()].Dec().ParserPacket(h264Slice[aRead:], remain)
+			aRead  = aRead  + nRead
 			remain = remain - nRead
 
 			//log.Trace("-----", hex.EncodeToString([]byte{'-','-','-',}), dec.Packet().GetPacketSize())
@@ -272,6 +275,7 @@ func rtpSend(conn *net.UDPConn){
 			//log.Debug("on frame :", frame)
 			if enc.GeneratePacket(frame) == 0 {
 				bytes := enc.ToBytes()
+				// use debug
 				file.Write(bytes)
 		
 				nalus := PackH264FrameToNalus(bytes)
@@ -305,14 +309,8 @@ func rtpSend(conn *net.UDPConn){
 }
 
 func main() {
-	args := os.Args
-	
-	if len(args) != 2 {
-		log.Critical("input args error")
-		return
-	}
 
-	local := "0.0.0.0:" + args[1]
+	local := "0.0.0.0:8000"
 	log.Debug("local listen addr : ", local)
 
 	vedioAddr, err := net.ResolveUDPAddr("udp", local)

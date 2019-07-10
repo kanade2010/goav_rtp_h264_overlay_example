@@ -281,3 +281,7 @@ func (d *Descriptor) AvcodecDescriptorNext() *Descriptor {
 func AvcodecDescriptorGetByName(n string) *Descriptor {
 	return (*Descriptor)(C.avcodec_descriptor_get_by_name(C.CString(n)))
 }
+
+func AvFetSampleFmtName(sample_fmt AvSampleFormat) string {
+	return C.GoString(C.av_get_sample_fmt_name(C.enum_AVSampleFormat(sample_fmt)))
+}

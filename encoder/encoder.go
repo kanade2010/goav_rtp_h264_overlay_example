@@ -32,6 +32,11 @@ func AllocAll(codecId avcodec.CodecId) *Encoder{
 		log.Critical("AvcodecAllocContext3 failed.")
 	}
 
+	/*err := context.AvcodecOpen2(codec, nil)
+	if err < 0 {
+		log.Critical("AvcodecOpen2 failed.")
+	}*/
+
 	return &Encoder{
 		codec,
 		context,
@@ -43,7 +48,30 @@ func (d *Encoder) Packet() *avcodec.Packet {
 	return d.pkt
 }
 
+func (d *Encoder) Context() *avcodec.Context {
+	return d.context
+}
+
 func (e *Encoder) SetEncodeParams(width int, height int, pxlFmt avcodec.PixelFormat, hasBframes bool, gopSize, num, den int) {
+	e.context.SetEncodeParams2(width, height, pxlFmt, hasBframes, gopSize)
+	e.context.SetTimebase(num, den)
+
+	err := e.context.AvcodecOpen2(e.codec, nil)
+	if err < 0 {
+		log.Critical("AvcodecOpen2 failed.")
+	}
+}
+
+func (e *Encoder) SetAudioEncodeParamsAndOpened() {
+	e.context.SetAudioEncodeParams()
+
+	err := e.context.AvcodecOpen2(e.codec, nil)
+	if err < 0 {
+		log.Critical("AvcodecOpen2 failed.")
+	}
+}
+
+func (e *Encoder) SetVideoEncodeParamsAndOpened(width int, height int, pxlFmt avcodec.PixelFormat, hasBframes bool, gopSize, num, den int) {
 	e.context.SetEncodeParams2(width, height, pxlFmt, hasBframes, gopSize)
 	e.context.SetTimebase(num, den)
 
@@ -57,18 +85,36 @@ func (e *Encoder) SetEncodeParams(width int, height int, pxlFmt avcodec.PixelFor
 func (e *Encoder) GeneratePacket(frame *avutil.Frame) int {
 	ret := e.context.AvcodecSendFrame((*avcodec.Frame)(unsafe.Pointer(frame)))
 	if ret < 0 {
-		log.Trace("AvcodecSendPacket err ", avutil.ErrorFromCode(ret))
+		log.Trace("AvcodecSendFrame err ", avutil.ErrorFromCode(ret))
 		return ret
 	}
 
 	ret = e.context.AvcodecReceivePacket(e.pkt)
 	if ret < 0 {
-		log.Trace("AvcodecReceiveFrame err ", avutil.ErrorFromCode(ret))
+		log.Trace("AvcodecReceivePacket err ", avutil.ErrorFromCode(ret))
 		return ret
 	}
 
-	avutil.AvFrameUnref(frame)
 	return ret
+}
+
+func (e *Encoder) SendFrame(frame *avutil.Frame) int {
+	ret := e.context.AvcodecSendFrame((*avcodec.Frame)(unsafe.Pointer(frame)))
+	if ret < 0 {
+		log.Trace("AvcodecSendFrame err ", avutil.ErrorFromCode(ret))
+		return ret
+	}
+	return ret
+}
+
+func (e *Encoder) ReapPacket() *avcodec.Packet {
+	ret := e.context.AvcodecReceivePacket(e.pkt)
+	if ret < 0 {
+		log.Trace("AvcodecReceivePacket err ", avutil.ErrorFromCode(ret))
+		return nil
+	}
+
+	return e.pkt
 }
 
 func (e *Encoder) ToBytes() []byte {
@@ -80,6 +126,6 @@ func (e *Encoder) ToBytes() []byte {
 		buf[i] = elem
 	}
 
-	e.Packet().AvPacketUnref()
+	//e.Packet().AvPacketUnref()
 	return buf
 }

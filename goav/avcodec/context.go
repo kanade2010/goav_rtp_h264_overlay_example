@@ -214,3 +214,13 @@ func (ctxt *Context) AvcodecSendFrame(frame *Frame) int {
 func (ctxt *Context) AvcodecReceivePacket(packet *Packet) int {
 	return (int)(C.avcodec_receive_packet((*C.struct_AVCodecContext)(ctxt), (*C.struct_AVPacket)(packet)))
 }
+
+func (ctxt *Context) SetAudioEncodeParams() {
+
+	//ctxt.bit_rate   	= 44100
+	ctxt.sample_fmt 	= AV_SAMPLE_FMT_FLTP
+	ctxt.sample_rate 	= 44100
+	ctxt.channel_layout = AV_CH_LAYOUT_STEREO
+	//ctxt.channels 	= 
+	//ctxt.frame_size     = 2048
+}
